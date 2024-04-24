@@ -1,0 +1,20 @@
+{
+    "CONFIGURACOES": {
+        "MAXIMO_MENSAGENS_ACUMULADAS": 0,
+        "DELAY_ENTRE_ENVIOS": 2,
+        "DELAY_ENTRE_CADA_MENSAGEM": true,
+        "METODO_ENVIO_PADRAO": "TEXT",
+        "FILTROS_DE_PESQUISA_DE_GRUPOS": [
+            "Test"
+        ]
+    },
+    "COMANDOS": {
+        "ENVIAR": "#ENVIAR#",
+        "PING": "#PING#",
+        "LIMPAR_MENSAGENS_ACUMULADAS": "#LIMPAR#",
+        "RECARREGAR_GRUPOS": "#RECARREGAR_GRUPOS#"
+    },
+    "WHITELIST": [
+        "553499999999"
+    ]
+}
