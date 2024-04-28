@@ -1,7 +1,7 @@
 require("console-stamp")(console, "dd/mm/yyyy HH:MM:ss");
 const qrcode = require("qrcode-terminal");
-const UserParameters = require("./parametros.json");
 const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
+let UserParameters = require("./parametros.json");
 
 const whatsappWebClient = new Client({
   authStrategy: new LocalAuth({}),
@@ -9,12 +9,6 @@ const whatsappWebClient = new Client({
     headless: false,
   },
 });
-UserParameters.COMANDOS = {
-  ENVIAR: "#ENVIAR#",
-  PING: "#PING#",
-  LIMPAR_MENSAGENS_ACUMULADAS: "#LIMPAR#",
-  RECARREGAR_GRUPOS: "#RECARREGAR_GRUPOS#",
-};
 let CHATS = {
   GROUPS: [],
   PRIVATE: [],
@@ -99,6 +93,15 @@ const onMessage = async (receivedMessage) => {
           console.log(`${CHATS.PRIVATE.length} conversas privadas`);
           console.log(`Pronto para uso`);
           receivedMessage.reply(`${CHATS.GROUPS.length} grupos\n${CHATS.PRIVATE.length} conversas privadas`);
+          break;
+
+        case UserParameters.COMANDOS.RECARREGAR_PARAMETROS:
+          console.log(`Recarregando arquivo de parametros...`);
+          await reloadParameters();
+          await sleep(1);
+          const parametersContent = JSON.stringify(UserParameters);
+          console.log(`Parâmetros atualizados:\n${parametersContent}`);
+          receivedMessage.reply(`Parâmetros atualizados.`);
           break;
 
         default:
@@ -297,7 +300,7 @@ const sendImageToWhatsApp = async (chat, message) => {
       const imageBuffer = await downloadImage(imageUrl);
       if (imageBuffer) {
         const media = new MessageMedia("image/webp", imageBuffer.toString("base64"));
-        chat.sendMessage(media, {
+        await chat.sendMessage(media, {
           caption: message,
         });
       } else {
@@ -309,6 +312,13 @@ const sendImageToWhatsApp = async (chat, message) => {
   } else {
     whatsappWebClient.sendMessage(chat, "Nenhum link válido encontrado na mensagem.");
   }
+};
+
+// função para recarregar o arquivo de parâmetros
+const reloadParameters = async () => {
+  const pathParameters = require.resolve("./parametros.json");
+  delete require.cache[pathParameters];
+  UserParameters = require("./parametros.json");
 };
 
 initializeBot();
