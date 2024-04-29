@@ -3,6 +3,13 @@ const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
 let UserParameters = require("./parametros.json");
 
+const COMMANDS = {
+  ENVIAR: "#ENVIAR#",
+  PING: "#PING#",
+  LIMPAR: "#LIMPAR#",
+  RECARREGAR_GRUPOS: "#RECARREGAR_GRUPOS#",
+  RECARREGAR_PARAMETROS: "#RECARREGAR_PARAMETROS#",
+};
 const whatsappWebClient = new Client({
   authStrategy: new LocalAuth({}),
   puppeteer: {
@@ -44,7 +51,7 @@ const onReady = async () => {
   console.log(`Login efetuado | [${whatsappWebClient.info.pushname}]`);
   console.log(`Obtendo lista de conversas...`);
   await sleep(5);
-  CHATS = await getChats(UserParameters.CONFIGURACOES.FILTROS_DE_PESQUISA_DE_GRUPOS);
+  CHATS = await getChats(UserParameters.FILTROS_DE_PESQUISA_DE_GRUPOS);
 
   console.log(`${CHATS.GROUPS.length} grupos`);
   console.log(`${CHATS.PRIVATE.length} conversas privadas`);
@@ -69,33 +76,33 @@ const onMessage = async (receivedMessage) => {
     const commandAndParams = getCommandAndParameters(receivedMessage.body);
     if (commandAndParams) {
       switch (commandAndParams.command) {
-        case UserParameters.COMANDOS.ENVIAR:
+        case COMMANDS.ENVIAR:
           const sendMethod = commandAndParams.parameters[0];
           await sendAllPendingMessages(sendMethod);
           break;
 
-        case UserParameters.COMANDOS.PING:
+        case COMMANDS.PING:
           receivedMessage.reply("PONG");
           break;
 
-        case UserParameters.COMANDOS.LIMPAR_MENSAGENS_ACUMULADAS:
+        case COMMANDS.LIMPAR:
           console.log(`Mensagens pendentes: ${PENDING_MESSAGES.length}`);
           PENDING_MESSAGES = [];
           console.log(`Mensagens removidas!`);
           console.log(`Mensagens pendentes: ${PENDING_MESSAGES.length}`);
           break;
 
-        case UserParameters.COMANDOS.RECARREGAR_GRUPOS:
+        case COMMANDS.RECARREGAR_GRUPOS:
           console.log(`Obtendo lista de conversas...`);
           await sleep(1);
-          CHATS = await getChats(UserParameters.CONFIGURACOES.FILTROS_DE_PESQUISA_DE_GRUPOS);
+          CHATS = await getChats(UserParameters.FILTROS_DE_PESQUISA_DE_GRUPOS);
           console.log(`${CHATS.GROUPS.length} grupos`);
           console.log(`${CHATS.PRIVATE.length} conversas privadas`);
           console.log(`Pronto para uso`);
           receivedMessage.reply(`${CHATS.GROUPS.length} grupos\n${CHATS.PRIVATE.length} conversas privadas`);
           break;
 
-        case UserParameters.COMANDOS.RECARREGAR_PARAMETROS:
+        case COMMANDS.RECARREGAR_PARAMETROS:
           console.log(`Recarregando arquivo de parametros...`);
           await reloadParameters();
           await sleep(1);
@@ -109,10 +116,10 @@ const onMessage = async (receivedMessage) => {
 a mensagem será adicionada à lista de envios pendentes...`);
           PENDING_MESSAGES.push(receivedMessage);
           console.log(
-            `Mesagem adicionada à lista de espera (${PENDING_MESSAGES.length}/${UserParameters.CONFIGURACOES.MAXIMO_MENSAGENS_ACUMULADAS})`
+            `Mesagem adicionada à lista de espera (${PENDING_MESSAGES.length}/${UserParameters.MAXIMO_MENSAGENS_ACUMULADAS})`
           );
 
-          if (PENDING_MESSAGES.length >= UserParameters.CONFIGURACOES.MAXIMO_MENSAGENS_ACUMULADAS) {
+          if (PENDING_MESSAGES.length >= UserParameters.MAXIMO_MENSAGENS_ACUMULADAS) {
             await sendAllPendingMessages();
           }
           break;
@@ -120,10 +127,10 @@ a mensagem será adicionada à lista de envios pendentes...`);
     } else {
       PENDING_MESSAGES.push(receivedMessage);
       console.log(
-        `Mesagem adicionada à lista de espera (${PENDING_MESSAGES.length}/${UserParameters.CONFIGURACOES.MAXIMO_MENSAGENS_ACUMULADAS})`
+        `Mesagem adicionada à lista de espera (${PENDING_MESSAGES.length}/${UserParameters.MAXIMO_MENSAGENS_ACUMULADAS})`
       );
 
-      if (PENDING_MESSAGES.length >= UserParameters.CONFIGURACOES.MAXIMO_MENSAGENS_ACUMULADAS) {
+      if (PENDING_MESSAGES.length >= UserParameters.MAXIMO_MENSAGENS_ACUMULADAS) {
         await sendAllPendingMessages();
       }
     }
@@ -189,7 +196,7 @@ const getCommandAndParameters = (message) => {
 const sendAllPendingMessages = async (method) => {
   const localPendingMessages = [...PENDING_MESSAGES];
   PENDING_MESSAGES = [];
-  let delayDefault = UserParameters.CONFIGURACOES.DELAY_ENTRE_ENVIOS;
+  let delayDefault = UserParameters.DELAY_ENTRE_ENVIOS;
   let delay = 0;
   if (delayDefault && delayDefault > 0) {
     const min = delayDefault - 1;
@@ -201,7 +208,7 @@ const sendAllPendingMessages = async (method) => {
     for (const message of localPendingMessages) {
       try {
         if (!method) {
-          method = UserParameters.CONFIGURACOES.METODO_ENVIO_PADRAO;
+          method = UserParameters.METODO_ENVIO_PADRAO;
         }
 
         // TEXT, IMAGE, FORWARD
@@ -220,14 +227,14 @@ const sendAllPendingMessages = async (method) => {
             break;
         }
 
-        if (UserParameters.CONFIGURACOES.DELAY_ENTRE_CADA_MENSAGEM) {
+        if (UserParameters.DELAY_ENTRE_CADA_MENSAGEM) {
           await sleep(delay);
         }
       } catch (error) {
         console.error(`Erro ao enviar mensagem: ${error.message}`);
       }
     }
-    if (!UserParameters.CONFIGURACOES.DELAY_ENTRE_CADA_MENSAGEM) {
+    if (!UserParameters.DELAY_ENTRE_CADA_MENSAGEM) {
       await sleep(delay);
     }
   }
