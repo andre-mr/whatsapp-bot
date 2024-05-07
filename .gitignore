@@ -1,0 +1,4 @@
+/.w*
+/node_modules
+/parametros.json
+./package-lock.json
