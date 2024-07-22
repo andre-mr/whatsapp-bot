@@ -1,6 +1,7 @@
 require("console-stamp")(console, "dd/mm/yyyy HH:MM:ss");
 const qrcode = require("qrcode-terminal");
 const { Client, LocalAuth, MessageMedia } = require("whatsapp-web.js");
+
 let UserParameters = require("./parametros.json");
 
 const COMMANDS = {
@@ -23,10 +24,29 @@ let CHATS = {
 let PENDING_MESSAGES = [];
 let isSending = false;
 const WA_USERID_SUFFIX = "@c.us";
+const COLORS = {
+  RESET: "\x1b[0m",
+  BRIGHT: "\x1b[1m",
+  REVERSE: "\x1b[7m",
+
+  RED: "\x1b[91m",
+  GREEN: "\x1b[92m",
+  YELLOW: "\x1b[93m",
+  CYAN: "\x1b[96m",
+};
+
+// função auxiliar para colorir o texto do console
+const consoleLogColor = (color, text, errorMessage) => {
+  if (errorMessage) {
+    console.error(`${color}${text}${COLORS.RESET}`, errorMessage);
+  } else {
+    console.log(`${color}${text}${COLORS.RESET}`);
+  }
+};
 
 // função que inicializa o bot
 const initializeBot = async () => {
-  console.log("Inicializando bot...");
+  consoleLogColor(COLORS.BRIGHT, "Inicializando bot...");
 
   whatsappWebClient.on("qr", onQrCode);
   whatsappWebClient.on("ready", onReady);
@@ -36,7 +56,7 @@ const initializeBot = async () => {
     await whatsappWebClient.initialize();
     return true;
   } catch (error) {
-    console.error("❗ Erro ao inicializar bot!", error);
+    consoleLogColor(COLORS.RED, "❗ Erro ao inicializar bot!", error);
   }
 };
 
@@ -52,24 +72,22 @@ const onReady = async () => {
   await sleep(5);
   CHATS = await getChats(UserParameters.FILTROS_DE_PESQUISA_DE_GRUPOS);
 
-  console.log(`${CHATS.GROUPS.length} grupos`);
-  console.log(`${CHATS.PRIVATE.length} conversas privadas`);
-  const welcomeMessage1 = `👋 Bot inicializado e pronto para uso`;
-  const welcomeMessage2 = `(${CHATS.GROUPS.length} grupos e ${CHATS.PRIVATE.length} conversas).`;
-  console.log(welcomeMessage1);
-  console.log(welcomeMessage2);
-  notifyWhitelist(welcomeMessage1 + "\r\n" + welcomeMessage2);
+  const welcomeMessage =
+    "👋 Bot inicializado e pronto para uso: " +
+    `${CHATS.GROUPS.length} grupos e ${CHATS.PRIVATE.length} conversas privadas.`;
+  consoleLogColor(COLORS.BRIGHT, welcomeMessage);
+  notifyAuthorizedPhones(welcomeMessage);
 };
 
-// função que detecta uma mensagem recebida, verifica se é da whitelist, checa se é comando e executa as ações
+// função que detecta uma mensagem recebida, verifica se é de celular autorizado, checa se é comando e executa as ações
 const onMessage = async (receivedMessage) => {
   console.log(" ");
   console.log("----------------------------------------");
   console.log("📨 Mensagem recebida!");
 
   const senderNumber = receivedMessage.from.replace(WA_USERID_SUFFIX, "");
-  if (UserParameters.WHITELIST.includes(senderNumber)) {
-    console.log("O número está na whitelist");
+  if (UserParameters.CELULARES_AUTORIZADOS.includes(senderNumber)) {
+    console.log("O número é de celular autorizado.");
     console.log(`Tipo: ${receivedMessage.type}`);
     console.log(`De: ${receivedMessage._data.notifyName} (${receivedMessage.from})`);
 
@@ -80,7 +98,7 @@ const onMessage = async (receivedMessage) => {
     }
     const commandAndParams = getCommandAndParameters(receivedMessage.body);
     if (commandAndParams) {
-      console.log(`Comando recebido: [${commandAndParams.command}]`);
+      consoleLogColor(COLORS.YELLOW, `Comando recebido: [${commandAndParams.command}]`);
       if (commandAndParams.parameters) {
         console.log(`Parâmetros: [${commandAndParams.command}]`);
       }
@@ -91,56 +109,63 @@ const onMessage = async (receivedMessage) => {
           break;
 
         case COMMANDS.PING:
+          consoleLogColor(COLORS.BRIGHT, "🆗 Ping-pong! ;)");
           receivedMessage.reply("PONG");
           break;
 
         case COMMANDS.LIMPAR:
           const removingMessagesCount = PENDING_MESSAGES.length;
           PENDING_MESSAGES = [];
-          console.log(`🗑 ${removingMessagesCount} mensagens removidas!`);
-          console.log(`Mensagens pendentes: ${PENDING_MESSAGES.length}`);
+          consoleLogColor(
+            COLORS.BRIGHT,
+            `🆗 ${removingMessagesCount} mensagens removidas! ${PENDING_MESSAGES.length} mensagens pendentes.`
+          );
+          receivedMessage.reply("Mensagens pendentes removidas!");
           break;
 
         case COMMANDS.RECARREGAR_GRUPOS:
-          console.log(`Obtendo lista de conversas...`);
           await sleep(1);
           CHATS = await getChats(UserParameters.FILTROS_DE_PESQUISA_DE_GRUPOS);
-          console.log(`Lista atualizada!`);
-          console.log(`${CHATS.GROUPS.length} grupos`);
-          console.log(`${CHATS.PRIVATE.length} conversas privadas`);
-          receivedMessage.reply(`${CHATS.GROUPS.length} grupos\r\n${CHATS.PRIVATE.length} conversas privadas`);
+          consoleLogColor(
+            COLORS.BRIGHT,
+            `🆗 Lista atualizada! ${CHATS.GROUPS.length} grupos e ${CHATS.PRIVATE.length} conversas privadas.`
+          );
+          receivedMessage.reply(
+            `Lista atualizada! ${CHATS.GROUPS.length} grupos e ${CHATS.PRIVATE.length} conversas privadas.`
+          );
           break;
 
         case COMMANDS.RECARREGAR_PARAMETROS:
-          console.log(`Recarregando arquivo de parametros...`);
           await reloadParameters();
           await sleep(1);
           const parametersContent = JSON.stringify(UserParameters);
-          console.log(`Parâmetros recarregados:\n${parametersContent}`);
+          consoleLogColor(COLORS.BRIGHT, `🆗 Parâmetros recarregados:\n${parametersContent}`);
           receivedMessage.reply(`Parâmetros recarregados!`);
           break;
 
         default:
-          console.log(`Comando inválido detectado: [${commandAndParams.command}]`);
+          consoleLogColor(COLORS.RED, `❗ Comando inválido detectado: [${commandAndParams.command}]`);
       }
     } else {
       PENDING_MESSAGES.push(receivedMessage);
       if (Number.parseInt(UserParameters.MAXIMO_MENSAGENS_ACUMULADAS || "0") > 0) {
-        console.log(`Mesagem enfileirada (${PENDING_MESSAGES.length}/${UserParameters.MAXIMO_MENSAGENS_ACUMULADAS})`);
+        console.log(
+          `📥 Mensagem enfileirada (${PENDING_MESSAGES.length}/${UserParameters.MAXIMO_MENSAGENS_ACUMULADAS})`
+        );
       } else {
-        console.log(`Mesagem enfileirada. ${PENDING_MESSAGES.length} na espera`);
-      }
-
-      if (PENDING_MESSAGES.length >= UserParameters.MAXIMO_MENSAGENS_ACUMULADAS && !isSending) {
-        isSending = true;
-        sendAllPendingMessages().finally(() => {
-          isSending = false;
-        });
+        console.log(`📥 Mensagem enfileirada. ${PENDING_MESSAGES.length} na espera`);
       }
     }
+    console.log("----------------------------------------");
+    console.log(" ");
+
+    if (!commandAndParams && PENDING_MESSAGES.length >= UserParameters.MAXIMO_MENSAGENS_ACUMULADAS && !isSending) {
+      isSending = true;
+      sendAllPendingMessages().finally(() => {
+        isSending = false;
+      });
+    }
   }
-  console.log("----------------------------------------");
-  console.log(" ");
 };
 
 // função que obtém as conversas existentes
@@ -166,7 +191,7 @@ const getChats = async (filters) => {
     });
     return filteredChats;
   } catch (error) {
-    console.error("❗ Erro ao obter lista de conversas!", error);
+    consoleLogColor(COLORS.RED, "❗ Erro ao obter lista de conversas!", error);
   }
 };
 
@@ -195,17 +220,21 @@ const getCommandAndParameters = (message) => {
 
 // função que envia todas as mensagens pendentes
 const sendAllPendingMessages = async (method) => {
-  let delayDefault = UserParameters.DELAY_ENTRE_ENVIOS;
-  let delay = 0;
-  if (delayDefault && delayDefault > 0) {
-    const min = delayDefault - 1;
-    const max = delayDefault + 1;
-    delay = Math.random() * (max - min) + min;
-  }
+  consoleLogColor(COLORS.YELLOW, "🚚 Iniciando envio de mensagens pendentes...");
+  console.log(" ");
+  const MAX_RETRIES = 3;
 
   while (PENDING_MESSAGES.length > 0) {
     const message = PENDING_MESSAGES.shift();
-    for (let i = 0; i < CHATS.GROUPS.length; i++) {
+
+    let startGroupIndex = 0;
+    message.retryCount = message.retryCount || 0;
+    if (message.failedGroupIndex !== undefined) {
+      startGroupIndex = message.failedGroupIndex;
+      delete message.failedGroupIndex;
+    }
+
+    for (let i = startGroupIndex; i < CHATS.GROUPS.length; i++) {
       try {
         if (!method) {
           method = UserParameters.METODO_ENVIO_PADRAO;
@@ -216,58 +245,120 @@ const sendAllPendingMessages = async (method) => {
           case "IMAGE":
             await sendImageToWhatsApp(CHATS.GROUPS[i], message.body);
             console.log(
-              `Imagem enviada para o grupo [${CHATS.GROUPS[i].name}]. ${
-                CHATS.GROUPS.length - i - 1
-              } grupo(s) restante(s).`
+              `✔ Mensagem enviada para o grupo [${CHATS.GROUPS[i].name}]. ${
+                CHATS.GROUPS.length - i - 1 > 0
+                  ? CHATS.GROUPS.length - i - 1 == 1
+                    ? `(${CHATS.GROUPS.length - i - 1} grupo restante)`
+                    : `(${CHATS.GROUPS.length - i - 1} grupos restantes)`
+                  : ""
+              }`
             );
             break;
           case "FORWARD":
-            await message.forward(CHATS.GROUPS[i]); // there's a bug on whatsapp-web.js forward function at 04/2024
+            await message.forward(CHATS.GROUPS[i]); // há um bug na função forward do whatsapp-web.js em 04/2024
             console.log(
-              `Mensagem encaminhada para o grupo [${CHATS.GROUPS[i].name}]. ${
-                CHATS.GROUPS.length - i - 1
-              } grupo(s) restante(s).`
+              `✔ Mensagem enviada para o grupo [${CHATS.GROUPS[i].name}]. ${
+                CHATS.GROUPS.length - i - 1 > 0
+                  ? CHATS.GROUPS.length - i - 1 == 1
+                    ? `${CHATS.GROUPS.length - i - 1} grupo restante.`
+                    : `${CHATS.GROUPS.length - i - 1} grupos restantes.`
+                  : ""
+              }`
             );
             break;
           default:
             await CHATS.GROUPS[i].sendMessage(message.body, { linkPreview: true });
             console.log(
-              `Mensagem enviada para o grupo [${CHATS.GROUPS[i].name}]. ${
-                CHATS.GROUPS.length - i - 1
-              } grupos restantes.`
+              `✔ Mensagem enviada para o grupo [${CHATS.GROUPS[i].name}]. ${
+                CHATS.GROUPS.length - i - 1 > 0
+                  ? CHATS.GROUPS.length - i - 1 == 1
+                    ? `${CHATS.GROUPS.length - i - 1} grupo restante.`
+                    : `${CHATS.GROUPS.length - i - 1} grupos restantes.`
+                  : ""
+              }`
             );
             break;
         }
 
-        if (UserParameters.DELAY_ENTRE_CADA_MENSAGEM && i < CHATS.GROUPS.length) {
-          await sleep(delay);
+        if (UserParameters.PAUSA_ENTRE_GRUPOS > 0 && i < CHATS.GROUPS.length - 1) {
+          let min, max, variation;
+          if (UserParameters.PAUSA_ENTRE_GRUPOS <= 10) {
+            variation = 1;
+            min = UserParameters.PAUSA_ENTRE_GRUPOS - variation;
+            max = UserParameters.PAUSA_ENTRE_GRUPOS + variation;
+          } else {
+            variation = Math.ceil(UserParameters.PAUSA_ENTRE_GRUPOS * 0.1);
+            min = UserParameters.PAUSA_ENTRE_GRUPOS - variation;
+            max = UserParameters.PAUSA_ENTRE_GRUPOS + variation;
+          }
+          const groupsDelay = Math.random() * (max - min) + min;
+          console.log(`⏳ Pausa de ${groupsDelay.toFixed(2)} segundos após envio para grupo...`);
+          await sleep(groupsDelay);
         }
       } catch (error) {
-        console.error("❗ Erro ao enviar mensagem!", error);
-        PENDING_MESSAGES.unshift(message);
+        consoleLogColor(COLORS.RED, "❗ Erro ao enviar mensagem!", error);
+        message.failedGroupIndex = i;
+        message.retryCount += 1;
+        if (message.retryCount < MAX_RETRIES) {
+          PENDING_MESSAGES.unshift(message);
+        } else {
+          consoleLogColor(
+            COLORS.YELLOW,
+            `❗ Limite de tentativas atingido para o grupo [${CHATS.GROUPS[i].name}]. Mensagem não enviada!`
+          );
+        }
         break;
       }
     }
+    console.log(`✅ Mensagem enviada para todos os grupos.`);
+    console.log(" ");
+
     if (PENDING_MESSAGES.length > 0) {
-      console.log(`${PENDING_MESSAGES.length} mensagens restantes.`);
-    } else {
-      console.log(`✅ Todas mensagens foram enviadas!`);
+      if (PENDING_MESSAGES.length == 1) {
+        console.log(`${PENDING_MESSAGES.length} mensagem pendente.`);
+      } else {
+        console.log(`${PENDING_MESSAGES.length} mensagens pendentes.`);
+      }
+    }
+
+    if (PENDING_MESSAGES.length > 0 && UserParameters.PAUSA_ENTRE_MENSAGENS > 0) {
+      let min, max, variation;
+      if (UserParameters.PAUSA_ENTRE_MENSAGENS <= 10) {
+        variation = 1;
+        min = UserParameters.PAUSA_ENTRE_MENSAGENS - variation;
+        max = UserParameters.PAUSA_ENTRE_MENSAGENS + variation;
+      } else {
+        variation = Math.ceil(UserParameters.PAUSA_ENTRE_MENSAGENS * 0.1);
+        min = UserParameters.PAUSA_ENTRE_MENSAGENS - variation;
+        max = UserParameters.PAUSA_ENTRE_MENSAGENS + variation;
+      }
+      const messagesDelay = Math.random() * (max - min) + min;
+      console.log(`⏳ Pausa de ${messagesDelay.toFixed(2)} segundos entre mensagens...`);
+      await sleep(messagesDelay);
+    }
+
+    if (PENDING_MESSAGES.length > 0) {
+      console.log(" ");
+    }
+
+    if (PENDING_MESSAGES.length > 0 && PENDING_MESSAGES[0].failedGroupIndex !== undefined) {
+      consoleLogColor(COLORS.BRIGHT`🔂 Tentando novamente a última mensagem para grupos que falharam...`);
+    } else if (PENDING_MESSAGES.length === 0) {
+      consoleLogColor(COLORS.GREEN, `✅ Todas as mensagens pendentes foram enviadas!`);
+      const notifyText = `👋 Todas as mensagens foram disparadas. Se necessário, verifique as mensagens enviadas.`;
+      notifyAuthorizedPhones(notifyText);
     }
   }
-
-  const notifyText =
-    `👋 Todas as mensagens foram disparadas.` + `\r\n` + `Se necessário, verifique as mensagens enviadas.`;
-  notifyWhitelist(notifyText);
 };
 
-// função que notifica os números da whitelist
-const notifyWhitelist = async (message) => {
-  for (const number of UserParameters.WHITELIST) {
+// função que notifica os números autorizados
+const notifyAuthorizedPhones = async (message) => {
+  for (const number of UserParameters.CELULARES_AUTORIZADOS) {
     try {
       await whatsappWebClient.sendMessage(`${number}${WA_USERID_SUFFIX}`, message);
-      console.log(`Mensagem enviada para ${number}`);
+      consoleLogColor(COLORS.CYAN, `📱 Notificação enviada para ${number}`);
     } catch (error) {
-      console.error(`❗ Erro ao enviar mensagem para ${number}`, error);
+      consoleLogColor(COLORS.RED, `❗ Erro ao enviar mensagem para ${number}`, error);
     }
   }
 };
@@ -298,7 +389,7 @@ const sendImageToWhatsApp = async (chat, message) => {
       }
       return null;
     } catch (error) {
-      console.error("❗ Erro ao obter URL da imagem!", error);
+      consoleLogColor(COLORS.RED, "❗ Erro ao obter URL da imagem!", error);
       return null;
     }
   };
@@ -310,7 +401,7 @@ const sendImageToWhatsApp = async (chat, message) => {
       const buffer = await response.arrayBuffer();
       return Buffer.from(buffer);
     } catch (error) {
-      console.error("❗ Erro ao baixar a imagem!", error);
+      consoleLogColor(COLORS.RED, "❗ Erro ao baixar a imagem!", error);
       return null;
     }
   };
