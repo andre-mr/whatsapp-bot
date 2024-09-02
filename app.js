@@ -161,7 +161,7 @@ const onMessage = async (receivedMessage) => {
 
     if (!commandAndParams && PENDING_MESSAGES.length >= UserParameters.MAXIMO_MENSAGENS_ACUMULADAS && !isSending) {
       isSending = true;
-      sendAllPendingMessages().finally(() => {
+      await sendAllPendingMessages().finally(() => {
         isSending = false;
       });
     }
@@ -176,6 +176,14 @@ const getChats = async (filters) => {
       PRIVATE: [],
     };
     const chatsList = await whatsappWebClient.getChats();
+    // Ordenar os chats pelo nome antes de filtrar e imprimir
+    chatsList.sort((a, b) => {
+      const nameA = (a.name || "").toUpperCase();
+      const nameB = (b.name || "").toUpperCase();
+      if (nameA < nameB) return -1;
+      if (nameA > nameB) return 1;
+      return 0;
+    });
     chatsList.forEach((chat) => {
       const chatName = chat.name || "";
       const isRelevant = filters && filters.some((filter) => chatName.toUpperCase().includes(filter.toUpperCase()));
@@ -224,6 +232,10 @@ const sendAllPendingMessages = async (method) => {
   console.log(" ");
   const MAX_RETRIES = 3;
 
+  if (!method) {
+    method = UserParameters.METODO_ENVIO_PADRAO;
+  }
+
   while (PENDING_MESSAGES.length > 0) {
     const message = PENDING_MESSAGES.shift();
 
@@ -236,10 +248,6 @@ const sendAllPendingMessages = async (method) => {
 
     for (let i = startGroupIndex; i < CHATS.GROUPS.length; i++) {
       try {
-        if (!method) {
-          method = UserParameters.METODO_ENVIO_PADRAO;
-        }
-
         // TEXT, IMAGE, FORWARD
         switch (method) {
           case "IMAGE":
@@ -254,8 +262,8 @@ const sendAllPendingMessages = async (method) => {
               }`
             );
             break;
-          case "FORWARD":
-            await message.forward(CHATS.GROUPS[i]); // há um bug na função forward do whatsapp-web.js em 04/2024
+          case "FORWARD": // não utilizar por enquanto, há um bug na função forward do whatsapp-web.js em 04/2024
+            await message.forward(CHATS.GROUPS[i]);
             console.log(
               `✔ Mensagem enviada para o grupo [${CHATS.GROUPS[i].name}]. ${
                 CHATS.GROUPS.length - i - 1 > 0
